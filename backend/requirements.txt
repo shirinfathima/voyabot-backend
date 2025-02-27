@@ -1,0 +1,10 @@
+Flask
+Flask-Cors
+Flask-JWT-Extended
+Flask-PyMongo
+requests
+python-dotenv
+gunicorn
+amadeus
+dialogflow
+google-cloud-dialogflow
