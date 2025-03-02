@@ -9,10 +9,12 @@ import os
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend interaction
 bcrypt = Bcrypt(app)
-app.config['JWT_SECRET_KEY'] = '8ded9ea94e8a7ecaf5078a0fc2d6df2254b11a33381b915b70ab4f0aa4146ae0'  # Change this to a strong secret key
+
+# Hardcoded JWT secret key
+app.config['JWT_SECRET_KEY'] = '8ded9ea94e8a7ecaf5078a0fc2d6df2254b11a33381b915b70ab4f0aa4146ae0'
 jwt = JWTManager(app)
 
-# Connect to MongoDB Atlas
+# Hardcoded MongoDB URI
 MONGO_URI = "mongodb+srv://shirinfathima003:ANhx61RJQ47TKc33@cluster1.9dyv4.mongodb.net/travel_bot?retryWrites=true&w=majority"
 client = MongoClient(MONGO_URI)
 db = client.travel_bot
@@ -22,7 +24,7 @@ users_collection = db.users
 responses_collection = db.responses
 questionnaire_collection = db.questionnaires  # New collection for questionnaire responses
 
-# OpenAI API Key
+# Hardcoded OpenAI API Key
 openai.api_key = "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"
 
 # Signup route
@@ -111,4 +113,5 @@ def submit_questionnaire():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    port = int(os.environ.get("PORT", 5001))  # Use PORT environment variable or default to 5001
+    app.run(debug=False, host="0.0.0.0", port=port)
