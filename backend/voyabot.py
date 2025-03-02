@@ -5,17 +5,21 @@ from flask_cors import CORS
 from pymongo import MongoClient
 import openai
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend interaction
 bcrypt = Bcrypt(app)
 
-# Hardcoded JWT secret key
-app.config['JWT_SECRET_KEY'] = '8ded9ea94e8a7ecaf5078a0fc2d6df2254b11a33381b915b70ab4f0aa4146ae0'
+# ✅ FIXED: Use proper environment variable names
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')  
 jwt = JWTManager(app)
 
-# Hardcoded MongoDB URI
-MONGO_URI = "mongodb+srv://shirinfathima003:ANhx61RJQ47TKc33@cluster1.9dyv4.mongodb.net/travel_bot?retryWrites=true&w=majority"
+# ✅ FIXED: Use the correct MongoDB URI from environment variables
+MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client.travel_bot
 
@@ -24,8 +28,8 @@ users_collection = db.users
 responses_collection = db.responses
 questionnaire_collection = db.questionnaires  # New collection for questionnaire responses
 
-# Hardcoded OpenAI API Key
-openai.api_key = "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"
+# ✅ FIXED: Use environment variable for OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Signup route
 @app.route('/signup', methods=['POST'])
@@ -112,6 +116,7 @@ def submit_questionnaire():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ✅ FIXED: Ensure the app runs on the correct port
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5001))  # Use PORT environment variable or default to 5001
+    port = int(os.getenv("PORT", 10000))  # Use Render's assigned port or default to 10000
     app.run(debug=False, host="0.0.0.0", port=port)
