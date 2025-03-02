@@ -31,6 +31,11 @@ questionnaire_collection = db.questionnaires  # New collection for questionnaire
 # ✅ FIXED: Use environment variable for OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Home route to avoid 404 errors
+@app.route('/')
+def home():
+    return jsonify({"message": "Voyabot backend is running!"})
+    
 # Signup route
 @app.route('/signup', methods=['POST'])
 def signup():
