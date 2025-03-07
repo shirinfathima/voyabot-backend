@@ -217,8 +217,8 @@ def webhook():
 
         elif intent_name == "Find_Hotel":
             city = parameters.get("city", "")
-            check_in = parameters.get("check-in", "")
-            check_out = parameters.get("check-out", "")
+            check_in = parameters.get("date-checkin", "")
+            check_out = parameters.get("date-checkout", "")
 
             if not city or not check_in or not check_out:
                 return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."})
