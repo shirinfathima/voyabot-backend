@@ -280,10 +280,16 @@ def chat():
             webhook_response = webhook()
             webhook_data = webhook_response.get_json()
 
+            # Check if the response is a fallback message
             if webhook_data and "fulfillmentText" in webhook_data:
-                return jsonify({"reply": webhook_data["fulfillmentText"], "user": username})
+                fulfillment_text = webhook_data["fulfillmentText"]
+                # If the response is a fallback message, fall back to Gemini
+                if fulfillment_text.lower() in ["i'm not sure how to help with that.", "no matching intent found."]:
+                    pass  # Fall back to Gemini
+                else:
+                    return jsonify({"reply": fulfillment_text, "user": username})
 
-        # If /webhook doesn't have a response, fall back to Gemini
+        # If /webhook doesn't have a meaningful response, fall back to Gemini
         for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
             try:
                 response = genai.GenerativeModel(model_name=model).generate_content(user_message)
