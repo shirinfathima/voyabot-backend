@@ -38,9 +38,9 @@ questions_collection = db.questions  # New collection for questions
 API_KEY = os.getenv("AMADEUS_API_KEY")
 API_SECRET = os.getenv("AMADEUS_API_SECRET")
 AMADEUS_TOKEN_URL = os.getenv("AMADEUS_TOKEN_URL")
-AMADEUS_FLIGHT_SEARCH_URL = os.getenv("AMADEUS_FLIGHT_SEARCH_URL")
-AMADEUS_HOTEL_SEARCH_URL = os.getenv("AMADEUS_HOTEL_SEARCH_URL")
-AMADEUS_PLACE_RECOMMENDATIONS_URL = os.getenv("AMADEUS_PLACE_RECOMMENDATIONS_URL")
+AMADEUS_FLIGHT_SEARCH_URL = os.getenv("AMADEUS_FLIGHT_SEARCH_URL")  # Correct spelling
+AMADEUS_HOTEL_SEARCH_URL = os.getenv("AMADEUS_HOTEL_SEARCH_URL")  # Correct spelling
+AMADEUS_PLACE_RECOMMENDATIONS_URL = os.getenv("AMADEUS_PLACE_RECOMMENDATIONS_URL")  # Correct spelling
 
 # Store the token and expiry time
 access_token = None
@@ -274,37 +274,33 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # Call the /webhook route directly
-        with app.test_request_context(json={"message": user_message}):
-            webhook_response = webhook()
-            webhook_data = webhook_response.get_json()
+        # Call the webhook function directly
+        webhook_response = webhook()
+        webhook_data = webhook_response.get_json()
 
-            # Check if the response is a fallback message
-            if webhook_data and "fulfillmentText" in webhook_data:
-                fulfillment_text = webhook_data["fulfillmentText"]
-                # If the response is a fallback message, fall back to Gemini
-                if fulfillment_text.lower() in ["i'm not sure how to help with that.", "no matching intent found."]:
-                    pass  # Fall back to Gemini
-                else:
-                    return jsonify({"reply": fulfillment_text, "user": username})
-
-        # If /webhook doesn't have a meaningful response, fall back to Gemini
-        for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
-            try:
-                response = genai.GenerativeModel(model_name=model).generate_content(user_message)
-                if response and response.text:
-                    return jsonify({"reply": response.text, "user": username})
-                else:
-                    continue  # Try the next model if no response
-            except Exception as e:
-                error_message = str(e)
-                if "model_not_found" in error_message or "quota_exceeded" in error_message:
-                    print(f"{model} not available, switching to next model...")
-                    continue  # Try the next model
-                else:
-                    return jsonify({"error": f"Gemini API error: {error_message}"}), 500
-
-        return jsonify({"error": "Both Gemini-1.5-pro and Gemini-1.5-flash failed. Please try again later."}), 500
+        # Check if the response is a fallback message
+        if webhook_data and "fulfillmentText" in webhook_data:
+            fulfillment_text = webhook_data["fulfillmentText"]
+            # If the response is a fallback message, fall back to Gemini
+            if fulfillment_text.lower() in ["i'm not sure how to help with that.", "no matching intent found."]:
+                # Fall back to Gemini
+                for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
+                    try:
+                        response = genai.GenerativeModel(model_name=model).generate_content(user_message)
+                        if response and response.text:
+                            return jsonify({"reply": response.text, "user": username})
+                        else:
+                            continue  # Try the next model if no response
+                    except Exception as e:
+                        error_message = str(e)
+                        if "model_not_found" in error_message or "quota_exceeded" in error_message:
+                            print(f"{model} not available, switching to next model...")
+                            continue  # Try the next model
+                        else:
+                            return jsonify({"error": f"Gemini API error: {error_message}"}), 500
+                return jsonify({"error": "Both Gemini-1.5-pro and Gemini-1.5-flash failed. Please try again later."}), 500
+            else:
+                return jsonify({"reply": fulfillment_text, "user": username})
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
