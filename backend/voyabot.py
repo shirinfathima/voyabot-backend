@@ -253,20 +253,6 @@ def webhook():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def handle_dialogflow_intent(user_message, username):
-    """
-    Handle Dialogflow-specific intents.
-    """
-    # Example: Check if the user message matches a specific intent
-    if "book a flight" in user_message.lower():
-        return "Sure! I can help you book a flight. Please provide your departure city, destination, and travel date."
-    elif "book a hotel" in user_message.lower():
-        return "Sure! I can help you book a hotel. Please provide the city, check-in date, and check-out date."
-    elif "weather" in user_message.lower():
-        return "I can check the weather for you. Please specify the city."
-    else:
-        return None  # Return None if no Dialogflow intent is matched
-        
 # Chat route with Gemini integration
 @app.route("/chat", methods=["POST"])
 @jwt_required()
@@ -278,12 +264,26 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # First, try to get a response from Dialogflow
-        dialogflow_response = handle_dialogflow_intent(user_message, username)
-        if dialogflow_response:
-            return jsonify({"reply": dialogflow_response, "user": username})
+        # Simulate a Dialogflow request
+        dialogflow_request = {
+            "queryResult": {
+                "intent": {
+                    "displayName": "Default Fallback Intent"  # Default intent
+                },
+                "parameters": {},
+                "queryText": user_message
+            }
+        }
 
-        # If Dialogflow doesn't have a response, fall back to Gemini
+        # Call the /webhook route internally
+        with app.test_request_context(json=dialogflow_request):
+            webhook_response = webhook()
+            webhook_data = webhook_response.get_json()
+
+            if webhook_data and "fulfillmentText" in webhook_data:
+                return jsonify({"reply": webhook_data["fulfillmentText"], "user": username})
+
+        # If /webhook doesn't have a response, fall back to Gemini
         for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
             try:
                 response = genai.GenerativeModel(model_name=model).generate_content(user_message)
