@@ -188,68 +188,77 @@ def webhook():
         data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "No data received"}), 400
+
         intent_name = data['queryResult']['intent']['displayName']
         parameters = data['queryResult']['parameters']
-        
+
         if intent_name == "Find_Flight":
-            origin = parameters.get("departure_city", "")
-            destination = parameters.get("destination_city", "")
+            departure_city = parameters.get("departure_city", "")
+            destination_city = parameters.get("destination_city", "")
             departure_date = parameters.get("date-time", "")
-            if not origin or not destination or not departure_date:
-                response_text = "Please provide departure city, destination, and date."
+
+            if not departure_city or not destination_city or not departure_date:
+                return jsonify({"fulfillmentText": "Please provide departure city, destination, and date."})
+
+            # Call the Amadeus API
+            flight_data = search_flights(departure_city, destination_city, departure_date)
+            if flight_data and "data" in flight_data and flight_data["data"]:
+                flights = flight_data["data"]
+                response_text = f"Found {len(flights)} flights from {departure_city} to {destination_city}:\n"
+                for flight in flights:
+                    airline = flight["itineraries"][0]["segments"][0]["carrierCode"]
+                    price = float(flight["price"]["total"])
+                    departure_time = flight["itineraries"][0]["segments"][0]["departure"]["at"]
+                    response_text += f"- {airline} flight at {departure_time} for ₹{price:.2f}\n"
             else:
-                flight_data = search_flights(origin, destination, departure_date)
-                if flight_data and "data" in flight_data and flight_data["data"]:
-                    flights = flight_data["data"]
-                    response_text = f"Found {len(flights)} flights from {origin} to {destination}:\n"
-                    for flight in flights:
-                        airline = flight["itineraries"][0]["segments"][0]["carrierCode"]
-                        price = float(flight["price"]["total"])
-                        departure_time = flight["itineraries"][0]["segments"][0]["departure"]["at"]
-                        response_text += f"- {airline} flight at {departure_time} for ₹{price:.2f}\n"
-                else:
-                    response_text = "No flights found for the given details."
-        
+                response_text = "No flights found for the given details."
+
+            return jsonify({"fulfillmentText": response_text})
+
         elif intent_name == "Find_Hotel":
-            city = parameters.get('city', 'unknown')
-            landmark = parameters.get('landmark', 'unknown')
-            checkin = parameters.get('date-checkin', 'unknown')
-            checkout = parameters.get('date-checkout', 'unknown')
-            hotel_type = parameters.get('hotel-type', 'unknown')
-            if city == 'unknown' or checkin == 'unknown' or checkout == 'unknown':
-                response_text = "Please provide city, check-in date, and check-out date."
+            city = parameters.get("city", "")
+            check_in = parameters.get("date-checkin", "")
+            check_out = parameters.get("date-checkout", "")
+
+            if not city or not check_in or not check_out:
+                return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."})
+
+            # Call the Amadeus API
+            hotel_data = search_hotels(city, check_in, check_out)
+            if hotel_data and "data" in hotel_data and hotel_data["data"]:
+                hotels = hotel_data["data"]
+                response_text = f"Found {len(hotels)} hotels in {city}:\n"
+                for hotel in hotels:
+                    name = hotel["name"]
+                    price = float(hotel["price"]["total"])
+                    response_text += f"- {name} for ₹{price:.2f}\n"
             else:
-                hotel_data = search_hotels(city, checkin, checkout)
-                if hotel_data and "data" in hotel_data and hotel_data["data"]:
-                    hotels = hotel_data["data"]
-                    response_text = f"Found {len(hotels)} hotels in {city} near {landmark}:\n"
-                    for hotel in hotels:
-                        name = hotel["name"]
-                        price = float(hotel["price"]["total"])
-                        response_text += f"- {name} for ₹{price:.2f}\n"
-                else:
-                    response_text = "No hotels found for the given details."
-        
+                response_text = "No hotels found for the given details."
+
+            return jsonify({"fulfillmentText": response_text})
+
         elif intent_name == "Place_Recommendation":
-            city = parameters.get('city', 'unknown')
-            place_type = parameters.get('place-type', 'unknown')
-            if city == 'unknown':
-                response_text = "Please provide a city."
+            city = parameters.get("city", "")
+            place_type = parameters.get("place-type", "")
+
+            if not city:
+                return jsonify({"fulfillmentText": "Please provide a city."})
+
+            # Call the Amadeus API
+            place_data = get_place_recommendations(city, place_type)
+            if place_data and "data" in place_data and place_data["data"]:
+                places = place_data["data"]
+                response_text = f"Found {len(places)} {place_type} recommendations in {city}:\n"
+                for place in places:
+                    name = place["name"]
+                    response_text += f"- {name}\n"
             else:
-                place_data = get_place_recommendations(city, place_type)
-                if place_data and "data" in place_data and place_data["data"]:
-                    places = place_data["data"]
-                    response_text = f"Found {len(places)} {place_type} recommendations in {city}:\n"
-                    for place in places:
-                        name = place["name"]
-                        response_text += f"- {name}\n"
-                else:
-                    response_text = "No recommendations found for the given details."
-        
+                response_text = "No recommendations found for the given details."
+
+            return jsonify({"fulfillmentText": response_text})
+
         else:
-            response_text = "I'm not sure how to help with that."
-        
-        return jsonify({"fulfillmentText": response_text})
+            return jsonify({"fulfillmentText": "I'm not sure how to help with that."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -264,19 +273,8 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # Simulate a Dialogflow request
-        dialogflow_request = {
-            "queryResult": {
-                "intent": {
-                    "displayName": "Default Fallback Intent"  # Default intent
-                },
-                "parameters": {},
-                "queryText": user_message
-            }
-        }
-
-        # Call the /webhook route internally
-        with app.test_request_context(json=dialogflow_request):
+        # Call the /webhook route directly
+        with app.test_request_context(json={"message": user_message}):
             webhook_response = webhook()
             webhook_data = webhook_response.get_json()
 
