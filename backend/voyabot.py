@@ -32,6 +32,7 @@ db = client.travel_bot
 users_collection = db.users
 responses_collection = db.responses
 questionnaire_collection = db.questionnaires
+questions_collection = db.questions  # New collection for questions
 
 # Amadeus API credentials and URLs
 API_KEY = os.getenv("AMADEUS_API_KEY")
@@ -275,6 +276,15 @@ def submit_questionnaire():
         }
         questionnaire_collection.insert_one(questionnaire_data)
         return jsonify({"message": "Questionnaire submitted successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Fetch questions from MongoDB
+@app.route('/get_questions', methods=['GET'])
+def get_questions():
+    try:
+        questions = list(questions_collection.find({}, {"_id": 0}))
+        return jsonify(questions), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
