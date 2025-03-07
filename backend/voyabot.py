@@ -190,6 +190,7 @@ def webhook():
             return jsonify({"error": "No data received"}), 400
         intent_name = data['queryResult']['intent']['displayName']
         parameters = data['queryResult']['parameters']
+        
         if intent_name == "Find_Flight":
             origin = parameters.get("departure_city", "")
             destination = parameters.get("destination_city", "")
@@ -208,23 +209,64 @@ def webhook():
                         response_text += f"- {airline} flight at {departure_time} for ₹{price:.2f}\n"
                 else:
                     response_text = "No flights found for the given details."
+        
         elif intent_name == "Find_Hotel":
             city = parameters.get('city', 'unknown')
             landmark = parameters.get('landmark', 'unknown')
             checkin = parameters.get('date-checkin', 'unknown')
             checkout = parameters.get('date-checkout', 'unknown')
             hotel_type = parameters.get('hotel-type', 'unknown')
-            response_text = f"Sure! Finding hotels in {city} near {landmark} from {checkin} to {checkout} of type {hotel_type}."
+            if city == 'unknown' or checkin == 'unknown' or checkout == 'unknown':
+                response_text = "Please provide city, check-in date, and check-out date."
+            else:
+                hotel_data = search_hotels(city, checkin, checkout)
+                if hotel_data and "data" in hotel_data and hotel_data["data"]:
+                    hotels = hotel_data["data"]
+                    response_text = f"Found {len(hotels)} hotels in {city} near {landmark}:\n"
+                    for hotel in hotels:
+                        name = hotel["name"]
+                        price = float(hotel["price"]["total"])
+                        response_text += f"- {name} for ₹{price:.2f}\n"
+                else:
+                    response_text = "No hotels found for the given details."
+        
         elif intent_name == "Place_Recommendation":
             city = parameters.get('city', 'unknown')
             place_type = parameters.get('place-type', 'unknown')
-            response_text = f"Sure! Here are some {place_type} recommendations in {city}."
+            if city == 'unknown':
+                response_text = "Please provide a city."
+            else:
+                place_data = get_place_recommendations(city, place_type)
+                if place_data and "data" in place_data and place_data["data"]:
+                    places = place_data["data"]
+                    response_text = f"Found {len(places)} {place_type} recommendations in {city}:\n"
+                    for place in places:
+                        name = place["name"]
+                        response_text += f"- {name}\n"
+                else:
+                    response_text = "No recommendations found for the given details."
+        
         else:
             response_text = "I'm not sure how to help with that."
+        
         return jsonify({"fulfillmentText": response_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def handle_dialogflow_intent(user_message, username):
+    """
+    Handle Dialogflow-specific intents.
+    """
+    # Example: Check if the user message matches a specific intent
+    if "book a flight" in user_message.lower():
+        return "Sure! I can help you book a flight. Please provide your departure city, destination, and travel date."
+    elif "book a hotel" in user_message.lower():
+        return "Sure! I can help you book a hotel. Please provide the city, check-in date, and check-out date."
+    elif "weather" in user_message.lower():
+        return "I can check the weather for you. Please specify the city."
+    else:
+        return None  # Return None if no Dialogflow intent is matched
+        
 # Chat route with Gemini integration
 @app.route("/chat", methods=["POST"])
 @jwt_required()
