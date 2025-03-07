@@ -198,7 +198,7 @@ def webhook():
             departure_date = parameters.get("date-time", "")
 
             if not departure_city or not destination_city or not departure_date:
-                return jsonify({"fulfillmentText": "Please provide departure city, destination, and date."}), 400
+                return jsonify({"fulfillmentText": "Please provide departure city, destination, and date."})
 
             # Call the Amadeus API
             flight_data = search_flights(departure_city, destination_city, departure_date)
@@ -213,7 +213,7 @@ def webhook():
             else:
                 response_text = "No flights found for the given details."
 
-            return jsonify({"fulfillmentText": response_text}), 200
+            return jsonify({"fulfillmentText": response_text})
 
         elif intent_name == "Find_Hotel":
             city = parameters.get("city", "")
@@ -221,7 +221,7 @@ def webhook():
             check_out = parameters.get("date-checkout", "")
 
             if not city or not check_in or not check_out:
-                return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."}), 400
+                return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."})
 
             # Call the Amadeus API
             hotel_data = search_hotels(city, check_in, check_out)
@@ -235,14 +235,14 @@ def webhook():
             else:
                 response_text = "No hotels found for the given details."
 
-            return jsonify({"fulfillmentText": response_text}), 200
+            return jsonify({"fulfillmentText": response_text})
 
         elif intent_name == "Place_Recommendation":
             city = parameters.get("city", "")
             place_type = parameters.get("place-type", "")
 
             if not city:
-                return jsonify({"fulfillmentText": "Please provide a city."}), 400
+                return jsonify({"fulfillmentText": "Please provide a city."})
 
             # Call the Amadeus API
             place_data = get_place_recommendations(city, place_type)
@@ -255,11 +255,10 @@ def webhook():
             else:
                 response_text = "No recommendations found for the given details."
 
-            return jsonify({"fulfillmentText": response_text}), 200
+            return jsonify({"fulfillmentText": response_text})
 
         else:
-            return jsonify({"fulfillmentText": "I'm not sure how to help with that."}), 200
-
+            return jsonify({"fulfillmentText": "I'm not sure how to help with that."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -274,41 +273,37 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # Call the webhook function directly
-        webhook_response = webhook()
+        # Call the /webhook route directly
+        with app.test_request_context(json={"message": user_message}):
+            webhook_response = webhook()
+            webhook_data = webhook_response.get_json()
 
-        # Check if webhook_response is a tuple (response, status_code)
-        if isinstance(webhook_response, tuple):
-            webhook_response, status_code = webhook_response  # Unpack the tuple
-        else:
-            status_code = 200  # Default status code if not a tuple
+            # Check if the response is a fallback message
+            if webhook_data and "fulfillmentText" in webhook_data:
+                fulfillment_text = webhook_data["fulfillmentText"]
+                # If the response is a fallback message, fall back to Gemini
+                if fulfillment_text.lower() in ["i'm not sure how to help with that.", "no matching intent found."]:
+                    pass  # Fall back to Gemini
+                else:
+                    return jsonify({"reply": fulfillment_text, "user": username})
 
-        # Extract JSON from the response
-        webhook_data = webhook_response.get_json()
+        # If /webhook doesn't have a meaningful response, fall back to Gemini
+        for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
+            try:
+                response = genai.GenerativeModel(model_name=model).generate_content(user_message)
+                if response and response.text:
+                    return jsonify({"reply": response.text, "user": username})
+                else:
+                    continue  # Try the next model if no response
+            except Exception as e:
+                error_message = str(e)
+                if "model_not_found" in error_message or "quota_exceeded" in error_message:
+                    print(f"{model} not available, switching to next model...")
+                    continue  # Try the next model
+                else:
+                    return jsonify({"error": f"Gemini API error: {error_message}"}), 500
 
-        # Check if the response is a fallback message
-        if webhook_data and "fulfillmentText" in webhook_data:
-            fulfillment_text = webhook_data["fulfillmentText"]
-            # If the response is a fallback message, fall back to Gemini
-            if fulfillment_text.lower() in ["i'm not sure how to help with that.", "no matching intent found."]:
-                # Fall back to Gemini
-                for model in ["models/gemini-1.5-pro-latest", "models/gemini-1.5-flash-latest"]:
-                    try:
-                        response = genai.GenerativeModel(model_name=model).generate_content(user_message)
-                        if response and response.text:
-                            return jsonify({"reply": response.text, "user": username})
-                        else:
-                            continue  # Try the next model if no response
-                    except Exception as e:
-                        error_message = str(e)
-                        if "model_not_found" in error_message or "quota_exceeded" in error_message:
-                            print(f"{model} not available, switching to next model...")
-                            continue  # Try the next model
-                        else:
-                            return jsonify({"error": f"Gemini API error: {error_message}"}), 500
-                return jsonify({"error": "Both Gemini-1.5-pro and Gemini-1.5-flash failed. Please try again later."}), 500
-            else:
-                return jsonify({"reply": fulfillment_text, "user": username})
+        return jsonify({"error": "Both Gemini-1.5-pro and Gemini-1.5-flash failed. Please try again later."}), 500
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
