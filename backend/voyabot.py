@@ -198,7 +198,7 @@ def webhook():
             departure_date = parameters.get("date-time", "")
 
             if not departure_city or not destination_city or not departure_date:
-                return jsonify({"fulfillmentText": "Please provide departure city, destination, and date."})
+                return jsonify({"fulfillmentText": "Please provide departure city, destination, and date."}), 400
 
             # Call the Amadeus API
             flight_data = search_flights(departure_city, destination_city, departure_date)
@@ -213,7 +213,7 @@ def webhook():
             else:
                 response_text = "No flights found for the given details."
 
-            return jsonify({"fulfillmentText": response_text})
+            return jsonify({"fulfillmentText": response_text}), 200
 
         elif intent_name == "Find_Hotel":
             city = parameters.get("city", "")
@@ -221,7 +221,7 @@ def webhook():
             check_out = parameters.get("date-checkout", "")
 
             if not city or not check_in or not check_out:
-                return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."})
+                return jsonify({"fulfillmentText": "Please provide city, check-in date, and check-out date."}), 400
 
             # Call the Amadeus API
             hotel_data = search_hotels(city, check_in, check_out)
@@ -235,14 +235,14 @@ def webhook():
             else:
                 response_text = "No hotels found for the given details."
 
-            return jsonify({"fulfillmentText": response_text})
+            return jsonify({"fulfillmentText": response_text}), 200
 
         elif intent_name == "Place_Recommendation":
             city = parameters.get("city", "")
             place_type = parameters.get("place-type", "")
 
             if not city:
-                return jsonify({"fulfillmentText": "Please provide a city."})
+                return jsonify({"fulfillmentText": "Please provide a city."}), 400
 
             # Call the Amadeus API
             place_data = get_place_recommendations(city, place_type)
@@ -255,10 +255,10 @@ def webhook():
             else:
                 response_text = "No recommendations found for the given details."
 
-            return jsonify({"fulfillmentText": response_text})
+            return jsonify({"fulfillmentText": response_text}), 200
 
         else:
-            return jsonify({"fulfillmentText": "I'm not sure how to help with that."})
+            return jsonify({"fulfillmentText": "I'm not sure how to help with that."}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -276,6 +276,14 @@ def chat():
     try:
         # Call the webhook function directly
         webhook_response = webhook()
+
+        # Check if webhook_response is a tuple (response, status_code)
+        if isinstance(webhook_response, tuple):
+            webhook_response, status_code = webhook_response  # Unpack the tuple
+        else:
+            status_code = 200  # Default status code if not a tuple
+
+        # Extract JSON from the response
         webhook_data = webhook_response.get_json()
 
         # Check if the response is a fallback message
