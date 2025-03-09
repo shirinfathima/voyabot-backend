@@ -104,7 +104,7 @@ def search_flights(origin, destination, departure_date=""):
     params = {
         "originLocationCode": origin,
         "destinationLocationCode": destination,
-        "departureDate": departure_date if departure_date else tomorrow
+        "departureDate": departure_date if departure_date else tomorrow,
         "adults": adults,
         "currencyCode": "INR",  # Changed to INR
         "max": 5
