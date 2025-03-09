@@ -80,8 +80,7 @@ def get_city_code(city_name):
     headers = {"Authorization": f"Bearer {token}"}
     params = {
         "subType": "CITY",
-        "keyword": city_name,
-        "max": 1  # Limit to 1 result
+        "keyword": city_name
     }
     try:
         response = requests.get(url, headers=headers, params=params)
