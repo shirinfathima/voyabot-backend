@@ -253,7 +253,50 @@ def webhook():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Chat route with Gemini integration
+# Helper function to extract intent and parameters from user_message
+def extract_intent_and_parameters(user_message):
+    # Example logic to determine intent and extract parameters
+    if "flight" in user_message.lower():
+        intent_name = "Find_Flight"
+        # Extract parameters (simple example; you might need a more robust parser)
+        parts = user_message.split()
+        departure_city = parts[parts.index("from") + 1] if "from" in parts else ""
+        destination_city = parts[parts.index("to") + 1] if "to" in parts else ""
+        date_time = parts[parts.index("on") + 1] if "on" in parts else ""
+        parameters = {
+            "departure_city": departure_city,
+            "destination_city": destination_city,
+            "date-time": date_time
+        }
+    elif "hotel" in user_message.lower():
+        intent_name = "Find_Hotel"
+        # Extract parameters
+        parts = user_message.split()
+        city = parts[parts.index("in") + 1] if "in" in parts else ""
+        checkin = parts[parts.index("from") + 1] if "from" in parts else ""
+        checkout = parts[parts.index("to") + 1] if "to" in parts else ""
+        parameters = {
+            "city": city,
+            "date-checkin": checkin,
+            "date-checkout": checkout
+        }
+    elif "recommendation" in user_message.lower() or "place" in user_message.lower():
+        intent_name = "Place_Recommendation"
+        # Extract parameters
+        parts = user_message.split()
+        city = parts[parts.index("in") + 1] if "in" in parts else ""
+        place_type = parts[parts.index("type") + 1] if "type" in parts else ""
+        parameters = {
+            "city": city,
+            "place-type": place_type
+        }
+    else:
+        intent_name = "Default Fallback Intent"
+        parameters = {}
+
+    return intent_name, parameters
+
+# Chat route with Dialogflow simulation and Gemini fallback
 @app.route("/chat", methods=["POST"])
 @jwt_required()
 def chat():
@@ -264,13 +307,16 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
+        # Extract intent and parameters from user_message
+        intent_name, parameters = extract_intent_and_parameters(user_message)
+
         # Simulate a Dialogflow request
         dialogflow_request = {
             "queryResult": {
                 "intent": {
-                    "displayName": "Default Fallback Intent"  # Default intent
+                    "displayName": intent_name
                 },
-                "parameters": {},
+                "parameters": parameters,
                 "queryText": user_message
             }
         }
