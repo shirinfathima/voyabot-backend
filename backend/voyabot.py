@@ -210,7 +210,7 @@ def webhook():
     try:
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({"error": "No data received"}), 400
+            return jsonify({"error": "No data received"})  # Return JSON, not a tuple
         intent_name = data['queryResult']['intent']['displayName']
         parameters = data['queryResult']['parameters']
         
@@ -292,9 +292,9 @@ def webhook():
         else:
             response_text = "I'm not sure how to help with that."
         
-        return jsonify({"fulfillmentText": response_text})
+        return jsonify({"fulfillmentText": response_text})  # Return JSON, not a tuple
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)})  # Return JSON, not a tuple
 
 def parse_and_format_date(date_str):
     """Parse a date string and format it as YYYY-MM-DD."""
@@ -335,7 +335,7 @@ def chat():
         # Call the /webhook route internally
         with app.test_request_context(json=dialogflow_request):
             webhook_response = webhook()
-            webhook_data = webhook_response.get_json()
+            webhook_data = webhook_response.get_json()  # Now safe to call .get_json()
 
             # Check if the response is a fallback message
             if webhook_data and "fulfillmentText" in webhook_data:
