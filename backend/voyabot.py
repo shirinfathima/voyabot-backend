@@ -41,7 +41,7 @@ AMADEUS_TOKEN_URL = os.getenv("AMADEUS_TOKEN_URL")
 AMADEUS_FLIGHT_SEARCH_URL = os.getenv("AMADEUS_FLIGHT_SEARCH_URL")
 AMADEUS_HOTEL_SEARCH_URL = os.getenv("AMADEUS_HOTEL_SEARCH_URL")
 AMADEUS_PLACE_RECOMMENDATIONS_URL = os.getenv("AMADEUS_PLACE_RECOMMENDATIONS_URL")
-
+AMADEUS_LOCATION_SEARCH_URL = os.getenv("AMADEUS_LOCATION_SEARCH_URL")
 # Store the token and expiry time
 access_token = None
 token_expiry = 0  # Stores UNIX timestamp
@@ -69,7 +69,30 @@ def get_access_token():
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Amadeus token: {e}")
         return None
-
+        
+def get_city_code(city_name):
+    """Fetch city code using Amadeus Location API."""
+    token = get_access_token()
+    if not token:
+        return None
+    url = AMADEUS_LOCATION_SEARCH_URL
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "subType": "CITY",
+        "keyword": city_name,
+        "max": 1  # Limit to 1 result
+    }
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if data and "data" in data and data["data"]:
+            return data["data"][0]["iataCode"]  # Return the IATA code
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching city code: {e}")
+        return None
+        
 def search_flights(origin, destination, departure_date, adults=1):
     """Search for flights using Amadeus API."""
     token = get_access_token()
@@ -263,9 +286,13 @@ def extract_intent_and_parameters(user_message):
         departure_city = parts[parts.index("from") + 1] if "from" in parts else ""
         destination_city = parts[parts.index("to") + 1] if "to" in parts else ""
         date_time = parts[parts.index("on") + 1] if "on" in parts else ""
+        # Fetch city codes using an external API
+        departure_city_code = get_city_code(departure_city)
+        destination_city_code = get_city_code(destination_city)
+
         parameters = {
-            "departure_city": departure_city,
-            "destination_city": destination_city,
+            "departure_city": departure_city_code,
+            "destination_city": destination_city_code,
             "date-time": date_time
         }
     elif "hotel" in user_message.lower():
