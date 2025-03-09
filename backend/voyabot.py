@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import google.generativeai as genai  # Import Gemini
 
 # Load environment variables
@@ -93,17 +93,18 @@ def get_city_code(city_name):
         print(f"Error fetching city code: {e}")
         return None
         
-def search_flights(origin, destination, departure_date, adults=1):
+def search_flights(origin, destination, departure_date=""):
     """Search for flights using Amadeus API."""
     token = get_access_token()
     if not token:
         return None
     url = AMADEUS_FLIGHT_SEARCH_URL
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     params = {
         "originLocationCode": origin,
         "destinationLocationCode": destination,
-        "departureDate": departure_date,
+        "departureDate": departure_date if departure_date else tomorrow
         "adults": adults,
         "currencyCode": "INR",  # Changed to INR
         "max": 5
@@ -214,10 +215,10 @@ def webhook():
         intent_name = data['queryResult']['intent']['displayName']
         parameters = data['queryResult']['parameters']
         
-        if intent_name == "Find_Flight":
-            origin = parameters.get("departure_city", "")
-            destination = parameters.get("destination_city", "")
-            departure_date = parameters.get("date-time", "")
+        if intent_name == "flight.search":
+            origin = parameters.get("from", {}).get("city", "")
+            destination = parameters.get("to", {}).get("city", "")
+            departure_date = parameters.get("departure", "")
 
             # Convert city names to codes
             origin_code = get_city_code(origin)
