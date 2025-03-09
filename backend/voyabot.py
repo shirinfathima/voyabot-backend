@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import requests
 import time
+from datetime import datetime
 import google.generativeai as genai  # Import Gemini
 
 # Load environment variables
@@ -276,45 +277,79 @@ def webhook():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def parse_and_format_date(date_str):
+    """Parse a date string and format it as YYYY-MM-DD."""
+    try:
+        # Try parsing the date in various formats
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")  # Default format
+        return date_obj.strftime("%Y-%m-%d")
+    except ValueError:
+        try:
+            # Try parsing other common formats
+            date_obj = datetime.strptime(date_str, "%d-%m-%Y")  # DD-MM-YYYY
+            return date_obj.strftime("%Y-%m-%d")
+        except ValueError:
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")  # MM/DD/YYYY
+                return date_obj.strftime("%Y-%m-%d")
+            except ValueError:
+                return None  # Return None if the date cannot be parsed
+                
 # Helper function to extract intent and parameters from user_message
 def extract_intent_and_parameters(user_message):
     # Example logic to determine intent and extract parameters
     if "flight" in user_message.lower():
         intent_name = "Find_Flight"
         # Extract parameters (simple example; you might need a more robust parser)
-        parts = user_message.split()
+        parts = user_message.lower().split()
         departure_city = parts[parts.index("from") + 1] if "from" in parts else ""
         destination_city = parts[parts.index("to") + 1] if "to" in parts else ""
         date_time = parts[parts.index("on") + 1] if "on" in parts else ""
-        # Fetch city codes using an external API
+
+        # Fetch city codes using Amadeus API
         departure_city_code = get_city_code(departure_city)
         destination_city_code = get_city_code(destination_city)
+
+        # Parse and format the date
+        formatted_date = parse_and_format_date(date_time)
 
         parameters = {
             "departure_city": departure_city_code,
             "destination_city": destination_city_code,
-            "date-time": date_time
+            "date-time": formatted_date
         }
     elif "hotel" in user_message.lower():
         intent_name = "Find_Hotel"
         # Extract parameters
-        parts = user_message.split()
+        parts = user_message.lower().split()
         city = parts[parts.index("in") + 1] if "in" in parts else ""
         checkin = parts[parts.index("from") + 1] if "from" in parts else ""
         checkout = parts[parts.index("to") + 1] if "to" in parts else ""
+
+        # Fetch city code using Amadeus API
+        city_code = get_city_code(city)
+
+        # Parse and format the dates
+        formatted_checkin = parse_and_format_date(checkin)
+        formatted_checkout = parse_and_format_date(checkout)
+
         parameters = {
-            "city": city,
-            "date-checkin": checkin,
-            "date-checkout": checkout
+            "city": city_code,
+            "date-checkin": formatted_checkin,
+            "date-checkout": formatted_checkout
         }
     elif "recommendation" in user_message.lower() or "place" in user_message.lower():
         intent_name = "Place_Recommendation"
         # Extract parameters
-        parts = user_message.split()
+        parts = user_message.lower().split()
         city = parts[parts.index("in") + 1] if "in" in parts else ""
         place_type = parts[parts.index("type") + 1] if "type" in parts else ""
+
+        # Fetch city code using Amadeus API
+        city_code = get_city_code(city)
+
         parameters = {
-            "city": city,
+            "city": city_code,
             "place-type": place_type
         }
     else:
