@@ -218,13 +218,21 @@ def webhook():
             origin = parameters.get("departure_city", "")
             destination = parameters.get("destination_city", "")
             departure_date = parameters.get("date-time", "")
-            if not origin or not destination or not departure_date:
-                response_text = "Please provide departure city, destination, and date."
+
+            # Convert city names to codes
+            origin_code = get_city_code(origin)
+            destination_code = get_city_code(destination)
+
+            # Format the date
+            formatted_date = parse_and_format_date(departure_date)
+
+            if not origin_code or not destination_code or not formatted_date:
+                response_text = "Please provide valid departure city, destination, and date."
             else:
-                flight_data = search_flights(origin, destination, departure_date)
+                flight_data = search_flights(origin_code, destination_code, formatted_date)
                 if flight_data and "data" in flight_data and flight_data["data"]:
                     flights = flight_data["data"]
-                    response_text = f"Found {len(flights)} flights from {origin} to {destination}:\n"
+                    response_text = f"Found {len(flights)} flights from {origin_code} to {destination_code}:\n"
                     for flight in flights:
                         airline = flight["itineraries"][0]["segments"][0]["carrierCode"]
                         price = float(flight["price"]["total"])
@@ -239,13 +247,21 @@ def webhook():
             checkin = parameters.get('date-checkin', 'unknown')
             checkout = parameters.get('date-checkout', 'unknown')
             hotel_type = parameters.get('hotel-type', 'unknown')
-            if city == 'unknown' or checkin == 'unknown' or checkout == 'unknown':
-                response_text = "Please provide city, check-in date, and check-out date."
+
+            # Convert city name to code
+            city_code = get_city_code(city)
+
+            # Format the dates
+            formatted_checkin = parse_and_format_date(checkin)
+            formatted_checkout = parse_and_format_date(checkout)
+
+            if city_code == 'unknown' or formatted_checkin == 'unknown' or formatted_checkout == 'unknown':
+                response_text = "Please provide valid city, check-in date, and check-out date."
             else:
-                hotel_data = search_hotels(city, checkin, checkout)
+                hotel_data = search_hotels(city_code, formatted_checkin, formatted_checkout)
                 if hotel_data and "data" in hotel_data and hotel_data["data"]:
                     hotels = hotel_data["data"]
-                    response_text = f"Found {len(hotels)} hotels in {city} near {landmark}:\n"
+                    response_text = f"Found {len(hotels)} hotels in {city_code} near {landmark}:\n"
                     for hotel in hotels:
                         name = hotel["name"]
                         price = float(hotel["price"]["total"])
@@ -256,13 +272,17 @@ def webhook():
         elif intent_name == "Place_Recommendation":
             city = parameters.get('city', 'unknown')
             place_type = parameters.get('place-type', 'unknown')
-            if city == 'unknown':
-                response_text = "Please provide a city."
+
+            # Convert city name to code
+            city_code = get_city_code(city)
+
+            if city_code == 'unknown':
+                response_text = "Please provide a valid city."
             else:
-                place_data = get_place_recommendations(city, place_type)
+                place_data = get_place_recommendations(city_code, place_type)
                 if place_data and "data" in place_data and place_data["data"]:
                     places = place_data["data"]
-                    response_text = f"Found {len(places)} {place_type} recommendations in {city}:\n"
+                    response_text = f"Found {len(places)} {place_type} recommendations in {city_code}:\n"
                     for place in places:
                         name = place["name"]
                         response_text += f"- {name}\n"
@@ -293,71 +313,8 @@ def parse_and_format_date(date_str):
                 return date_obj.strftime("%Y-%m-%d")
             except ValueError:
                 return None  # Return None if the date cannot be parsed
-                
-# Helper function to extract intent and parameters from user_message
-def extract_intent_and_parameters(user_message):
-    # Example logic to determine intent and extract parameters
-    if "flight" in user_message.lower():
-        intent_name = "Find_Flight"
-        # Extract parameters (simple example; you might need a more robust parser)
-        parts = user_message.lower().split()
-        departure_city = parts[parts.index("from") + 1] if "from" in parts else ""
-        destination_city = parts[parts.index("to") + 1] if "to" in parts else ""
-        date_time = parts[parts.index("on") + 1] if "on" in parts else ""
 
-        # Fetch city codes using Amadeus API
-        departure_city_code = get_city_code(departure_city)
-        destination_city_code = get_city_code(destination_city)
-
-        # Parse and format the date
-        formatted_date = parse_and_format_date(date_time)
-
-        parameters = {
-            "departure_city": departure_city_code,
-            "destination_city": destination_city_code,
-            "date-time": formatted_date
-        }
-    elif "hotel" in user_message.lower():
-        intent_name = "Find_Hotel"
-        # Extract parameters
-        parts = user_message.lower().split()
-        city = parts[parts.index("in") + 1] if "in" in parts else ""
-        checkin = parts[parts.index("from") + 1] if "from" in parts else ""
-        checkout = parts[parts.index("to") + 1] if "to" in parts else ""
-
-        # Fetch city code using Amadeus API
-        city_code = get_city_code(city)
-
-        # Parse and format the dates
-        formatted_checkin = parse_and_format_date(checkin)
-        formatted_checkout = parse_and_format_date(checkout)
-
-        parameters = {
-            "city": city_code,
-            "date-checkin": formatted_checkin,
-            "date-checkout": formatted_checkout
-        }
-    elif "recommendation" in user_message.lower() or "place" in user_message.lower():
-        intent_name = "Place_Recommendation"
-        # Extract parameters
-        parts = user_message.lower().split()
-        city = parts[parts.index("in") + 1] if "in" in parts else ""
-        place_type = parts[parts.index("type") + 1] if "type" in parts else ""
-
-        # Fetch city code using Amadeus API
-        city_code = get_city_code(city)
-
-        parameters = {
-            "city": city_code,
-            "place-type": place_type
-        }
-    else:
-        intent_name = "Default Fallback Intent"
-        parameters = {}
-
-    return intent_name, parameters
-
-# Chat route with Dialogflow simulation and Gemini fallback
+# Chat route with Dialogflow integration
 @app.route("/chat", methods=["POST"])
 @jwt_required()
 def chat():
@@ -368,16 +325,9 @@ def chat():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        # Extract intent and parameters from user_message
-        intent_name, parameters = extract_intent_and_parameters(user_message)
-
         # Simulate a Dialogflow request
         dialogflow_request = {
             "queryResult": {
-                "intent": {
-                    "displayName": intent_name
-                },
-                "parameters": parameters,
                 "queryText": user_message
             }
         }
